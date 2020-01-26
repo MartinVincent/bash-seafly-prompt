@@ -131,12 +131,21 @@ _seafly_git_fallback() {
     branch=${branch//\\/\\\\}  # Escape backslashes
     branch=${branch//\$/\\\$}  # Escape dollars
 
+    local is_called_by_alias=${1:-"false"} # used for 'lg' alias
+    if [[ "$is_called_by_alias" == "true" ]]; then
+    	if [ -z "$(git status -s --porcelain  )" ]; then
+	  # no changes, so we quickly exit and simply print: [master]
+          _seafly_git=" $GREY$SEAFLY_GIT_PREFIX$branch$SEAFLY_GIT_SUFFIX"
+	  return
+  	fi
+    fi
+
     local dirty
     local staged
     if [[ $branch != "detached*" &&
           $GIT_PS1_SHOWDIRTYSTATE != 0 &&
           $(git config --bool bash.showDirtyState) != "false" ]]; then
-        git diff --no-ext-diff --quiet --exit-code --ignore-submodules 2>/dev/null || dirty=$SEAFLY_GIT_DIRTY
+        gi:/t diff --no-ext-diff --quiet --exit-code --ignore-submodules 2>/dev/null || dirty=$SEAFLY_GIT_DIRTY
         git diff --no-ext-diff --quiet --cached --exit-code --ignore-submodules 2>/dev/null || staged=$SEAFLY_GIT_STAGED
     fi
 
@@ -145,13 +154,22 @@ _seafly_git_fallback() {
         git rev-parse --verify --quiet refs/stash >/dev/null && stash=$SEAFLY_GIT_STASH
     fi
 
+    local untracked
+    if [[ $(git ls-files . --exclude-standard --others --error-unmatch 2>/dev/null )  ]]; then
+    	if [[ "$is_called_by_alias" == "true" ]]; then
+          untracked='? '
+	else
+          untracked='\[$(tput bold)\]?\[$NOCOLOR\] '
+	fi
+    fi
+
     local upstream
     if [[ $GIT_PS1_SHOWUPSTREAM != 0 ]]; then
         case "$(git rev-list --left-right --count HEAD...@'{u}' 2>/dev/null)" in
         "") # no upstream
-            upstream="" ;;
+            upstream="∄ " ;;
         "0	0") # equal to upstream
-            upstream="=" ;;
+            upstream="" ;;
         "0	"*) # behind upstream
             upstream=$SEAFLY_GIT_BEHIND ;;
         *"	0") # ahead of upstream
@@ -162,10 +180,16 @@ _seafly_git_fallback() {
     fi
 
     local spacer
-    if [[ -n $dirty || -n $staged || -n $stash || -n $upstream ]]; then
+    if [[ -n $dirty || -n $staged || -n $stash || -n $upstream || -n $untracked ]]; then
         spacer=" "
     fi
-    _seafly_git=" $SEAFLY_GIT_PREFIX$branch$spacer\[$SEAFLY_ALERT_COLOR\]$dirty\[$SEAFLY_NORMAL_COLOR\]$staged$upstream\[$SEAFLY_GIT_COLOR\]$stash$SEAFLY_GIT_SUFFIX"
+
+    if [[ "$is_called_by_alias" == "true" ]]; then
+        _seafly_git=" $SEAFLY_PATH_COLOR$SEAFLY_GIT_PREFIX$branch$spacer$SEAFLY_ALERT_COLOR$dirty$untracked$SEAFLY_NORMAL_COLOR$staged$SEAFLY_ALERT_COLOR$upstream$SEAFLY_NORMAL_COLOR$SEAFLY_GIT_COLOR$YELLOW$stash$SEAFLY_PATH_COLOR$SEAFLY_GIT_SUFFIX"
+    else
+        _seafly_git=" \[$SEAFLY_NORMAL_COLOR\]$SEAFLY_GIT_PREFIX$branch$spacer\[$SEAFLY_ALERT_COLOR\]$dirty$untracked\[$SEAFLY_NORMAL_COLOR\]$staged\[$SEAFLY_ALERT_COLOR\]$upstream\[$SEAFLY_NORMAL_COLOR\]\[$SEAFLY_GIT_COLOR\]\[$YELLOW\]$stash\[$SEAFLY_NORMAL_COLOR\]$SEAFLY_GIT_SUFFIX"
+    fi
+
 }
 
 _seafly_command_prompt() {
@@ -201,7 +225,18 @@ _seafly_command_prompt() {
     _seafly_colors=("$SEAFLY_ALERT_COLOR" "$SEAFLY_NORMAL_COLOR")
     local prompt_end="\[\${_seafly_colors[\$((!\$?))]}\] $SEAFLY_PROMPT_SYMBOL\[\$NOCOLOR\] "
 
-    PS1="$prompt_prefix$prompt_start$prompt_middle$prompt_end"
+    if [[ $CHRONO_EXECUTION_COMMANDE -eq 1 ]]; then
+      timer_stop
+      if [[ $flag_plus_grand_quune_minute == "true" ]]; then
+        couleur="${LIGHTYELLOWX}"
+      else
+        couleur="${LIGHTBLACK}"
+      fi
+      #chronometre="$couleur[$timer_show]$RESET "
+      printf "%`tput cols`s`tput cr`" "${couleur}${timer_show}${RESET}"
+    fi
+
+    PS1="$chronometre$prompt_prefix$prompt_start$prompt_middle$prompt_end"
     PS2="\[$SEAFLY_NORMAL_COLOR\]$SEAFLY_PS2_PROMPT_SYMBOL\[\$NOCOLOR\] "
 }
 
