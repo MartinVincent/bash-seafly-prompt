@@ -145,7 +145,7 @@ _seafly_git_fallback() {
     if [[ $branch != "detached*" &&
           $GIT_PS1_SHOWDIRTYSTATE != 0 &&
           $(git config --bool bash.showDirtyState) != "false" ]]; then
-        gi:/t diff --no-ext-diff --quiet --exit-code --ignore-submodules 2>/dev/null || dirty=$SEAFLY_GIT_DIRTY
+        git diff --no-ext-diff --quiet --exit-code --ignore-submodules 2>/dev/null || dirty=$SEAFLY_GIT_DIRTY
         git diff --no-ext-diff --quiet --cached --exit-code --ignore-submodules 2>/dev/null || staged=$SEAFLY_GIT_STAGED
     fi
 
